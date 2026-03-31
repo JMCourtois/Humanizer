@@ -1,95 +1,83 @@
-import {
-  AGENT_DESCRIPTIONS,
-  AGENT_LABELS,
-  AgentName,
-  AgentStatus,
-} from "@/lib/types";
+import { FlowNodeView, FlowView } from "@/lib/view-models";
 
 interface AgentGraphProps {
-  agentStatuses: Record<AgentName, AgentStatus>;
-  currentStep: string;
-  revisionTriggered: boolean;
+  flow: FlowView;
 }
 
-export function AgentGraph({
-  agentStatuses,
-  currentStep,
-  revisionTriggered,
-}: AgentGraphProps) {
+function FlowNodeCard({ node }: { node: FlowNodeView }) {
   return (
-    <section className="panel">
+    <article
+      className={`flow-node status-${node.status} ${node.isActive ? "is-active" : ""} ${
+        node.isRecent ? "is-recent" : ""
+      }`}
+    >
+      <div className="flow-node-header">
+        <div>
+          <div className="flow-node-title">{node.label}</div>
+          <p className="flow-node-summary">{node.summary}</p>
+        </div>
+        {node.badge ? <span className="status-chip">{node.badge}</span> : null}
+      </div>
+      <p className="flow-node-detail">{node.detail}</p>
+    </article>
+  );
+}
+
+export function AgentGraph({ flow }: AgentGraphProps) {
+  return (
+    <section className="panel flow-panel">
       <div className="panel-header">
         <div>
-          <h2>Agent Graph</h2>
-          <p>Each node is a prompt role. The orchestrator handles sequencing and handoffs.</p>
+          <h2>Pipeline Flow</h2>
+          <p>The swimlane shows sequence, evaluation split, and the single revision return path.</p>
         </div>
       </div>
 
-      <div className="graph-stage">
-        <div className="connector vertical connector-brief" />
-        <div className="connector diagonal connector-left" />
-        <div className="connector diagonal connector-right" />
-        <div className={`feedback-rail ${revisionTriggered ? "active" : ""}`} />
-
-        <div className={`agent-node node-brief status-${agentStatuses.brief.status}`}>
-          <div className="node-header">
-            <span>{AGENT_LABELS.brief}</span>
-            <span className="status-chip">{agentStatuses.brief.status}</span>
-          </div>
-          <p>{AGENT_DESCRIPTIONS.brief}</p>
+      <div className="flow-header-row">
+        <div className="handoff-card">
+          <span className="overview-label">Current handoff</span>
+          <strong>{flow.activeHandoffLabel}</strong>
         </div>
-
-        <div
-          className={`agent-node node-humanizer status-${agentStatuses.humanizer.status}`}
-        >
-          <div className="node-header">
-            <span>{AGENT_LABELS.humanizer}</span>
-            <span className="status-chip">{agentStatuses.humanizer.status}</span>
-          </div>
-          <p>{AGENT_DESCRIPTIONS.humanizer}</p>
-        </div>
-
-        <div
-          className={`agent-node node-guard status-${agentStatuses.meaningGuard.status}`}
-        >
-          <div className="node-header">
-            <span>{AGENT_LABELS.meaningGuard}</span>
-            <span className="status-chip">{agentStatuses.meaningGuard.status}</span>
-          </div>
-          <p>{AGENT_DESCRIPTIONS.meaningGuard}</p>
-        </div>
-
-        <div
-          className={`agent-node node-critic status-${agentStatuses.naturalnessCritic.status}`}
-        >
-          <div className="node-header">
-            <span>{AGENT_LABELS.naturalnessCritic}</span>
-            <span className="status-chip">
-              {agentStatuses.naturalnessCritic.status}
-            </span>
-          </div>
-          <p>{AGENT_DESCRIPTIONS.naturalnessCritic}</p>
+        <div className={`revision-pill state-${flow.revisionState}`}>
+          <span className="overview-label">Revision loop</span>
+          <strong>{flow.revisionLabel}</strong>
         </div>
       </div>
 
-      <div className="relationship-list">
-        <div className="relationship-item">
-          Brief Agent{" -> "}Humanizer Agent
-        </div>
-        <div className="relationship-item">
-          Humanizer Agent{" -> "}Meaning Guard Agent
-        </div>
-        <div className="relationship-item">
-          Humanizer Agent{" -> "}Naturalness Critic Agent
-        </div>
-        <div className={`relationship-item ${revisionTriggered ? "active" : ""}`}>
-          Guard/Critic feedback{" -> "}Humanizer Agent
-        </div>
-      </div>
+      <div className="flow-scroll">
+        <div className="flow-canvas">
+          <div className="swimlane">
+            <FlowNodeCard node={flow.nodes.input} />
+            <div className="flow-arrow">handoff</div>
+            <FlowNodeCard node={flow.nodes.brief} />
+            <div className="flow-arrow">brief</div>
+            <FlowNodeCard node={flow.nodes.humanizer} />
+            <div className="flow-arrow">review</div>
 
-      <div className="current-step">
-        <span className="technical-chip">Current step</span>
-        <strong>{currentStep}</strong>
+            <div className="evaluation-column">
+              <div className="evaluation-header">
+                <span className="overview-label">Evaluation split</span>
+                <span className="technical-chip">Guard + Critic</span>
+              </div>
+              <FlowNodeCard node={flow.nodes.meaningGuard} />
+              <FlowNodeCard node={flow.nodes.naturalnessCritic} />
+            </div>
+
+            <div className="flow-arrow">decide</div>
+            <FlowNodeCard node={flow.nodes.decision} />
+            <div className="flow-arrow">finalize</div>
+            <FlowNodeCard node={flow.nodes.final} />
+          </div>
+
+          <div className={`revision-loop state-${flow.revisionState}`}>
+            <span className="revision-loop-label">Single retry path</span>
+            <div className="revision-loop-track">
+              <span>Decision Gate</span>
+              <span className="revision-loop-dash" />
+              <span>Humanizer Agent</span>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );

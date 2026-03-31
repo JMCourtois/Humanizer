@@ -9,6 +9,11 @@ function prettyJson(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
 
+const jsonOutputRules = `
+- Return exactly one JSON object.
+- Start the response with { and end it with }.
+- Never include <think> tags, markdown fences, or explanatory text.`;
+
 const briefSchema = {
   summary: "string",
   robotic_patterns: ["string"],
@@ -48,7 +53,7 @@ Rules:
 - Do not invent facts or context.
 - Focus on stiffness, rhythm, generic phrasing, over-signposting, and unnatural transitions.
 - Preserve substance, claims, facts, names, numbers, and important nuance.
-- Return raw JSON only. No markdown fences. No commentary.`,
+- Return raw JSON only. No markdown fences. No commentary.${jsonOutputRules}`,
     userPrompt: `Analyze the text below and return JSON that exactly matches this shape:
 
 ${prettyJson(briefSchema)}
@@ -96,7 +101,7 @@ Rules:
 - Do not become overly casual or slang-heavy.
 - Improve rhythm, specificity, and sentence variety.
 - Remove robotic transitions, stiff signposting, and obvious AI filler.
-- Return raw JSON only. No markdown fences. No commentary.`,
+- Return raw JSON only. No markdown fences. No commentary.${jsonOutputRules}`,
     userPrompt: `Use the brief and source text below to produce pass ${input.passNumber}.
 
 Return JSON that exactly matches this shape:
@@ -125,7 +130,7 @@ Rules:
 - Check for changed claims, lost nuance, oversimplification, stronger certainty, or altered scope.
 - Approve only if the rewrite preserves the source meaning well enough to trust.
 - Provide short, concrete fix instructions when you detect issues.
-- Return raw JSON only. No markdown fences. No commentary.`,
+- Return raw JSON only. No markdown fences. No commentary.${jsonOutputRules}`,
     userPrompt: `Compare the original and rewritten text below.
 
 Return JSON that exactly matches this shape:
@@ -155,7 +160,7 @@ Rules:
 - Focus on cadence, phrasing, specificity, transitions, and whether the writing still feels templated.
 - Score naturalness from 1 to 10, where 10 feels convincingly human.
 - Give short, specific feedback, not vague preferences.
-- Return raw JSON only. No markdown fences. No commentary.`,
+- Return raw JSON only. No markdown fences. No commentary.${jsonOutputRules}`,
     userPrompt: `Review the rewrite below.
 
 Return JSON that exactly matches this shape:

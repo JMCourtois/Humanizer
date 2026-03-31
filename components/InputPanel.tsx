@@ -19,6 +19,8 @@ export function InputPanel({
   onLoadSample,
   onRun,
 }: InputPanelProps) {
+  const wordCount = inputText.trim().match(/\S+/g)?.length ?? 0;
+
   return (
     <section className="panel">
       <div className="panel-header">
@@ -27,6 +29,12 @@ export function InputPanel({
           <p>Paste AI-written text or load the sample to watch the pipeline work.</p>
         </div>
         <span className="technical-chip">Server-side MiniMax</span>
+      </div>
+
+      <div className="input-meta-row">
+        <span className="metric-pill">{wordCount} words</span>
+        <span className="metric-pill">Route handlers only</span>
+        <span className="metric-pill">No browser API key exposure</span>
       </div>
 
       <label className="input-label" htmlFor="humanizer-input">

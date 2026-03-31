@@ -5,13 +5,21 @@ import { useEffect, useMemo, useState } from "react";
 import { AgentCard } from "@/components/AgentCard";
 import { AgentGraph } from "@/components/AgentGraph";
 import { InputPanel } from "@/components/InputPanel";
+import { JobOverview } from "@/components/JobOverview";
+import { NowHappening } from "@/components/NowHappening";
 import { ResultPanel } from "@/components/ResultPanel";
 import { Timeline } from "@/components/Timeline";
 import {
   JobState,
-  OUTPUT_CARD_ORDER,
   createInitialAgentStatuses,
 } from "@/lib/types";
+import {
+  deriveActivityFeed,
+  deriveAgentCards,
+  deriveFlowView,
+  deriveJobOverview,
+  deriveNowHappening,
+} from "@/lib/view-models";
 
 const POLL_INTERVAL_MS = 900;
 
@@ -76,6 +84,7 @@ export function HumanizerLab({ sampleText }: HumanizerLabProps) {
   const [jobId, setJobId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [clock, setClock] = useState(() => Date.now());
 
   useEffect(() => {
     if (!jobId || !job || (job.status !== "queued" && job.status !== "running")) {
@@ -98,25 +107,30 @@ export function HumanizerLab({ sampleText }: HumanizerLabProps) {
     return () => window.clearInterval(intervalId);
   }, [jobId, job?.status]);
 
+  useEffect(() => {
+    if (!job || (job.status !== "queued" && job.status !== "running")) {
+      return;
+    }
+
+    setClock(Date.now());
+
+    const intervalId = window.setInterval(() => {
+      setClock(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [job?.id, job?.status]);
+
   const canRun =
     inputText.trim().length > 0 &&
     !isSubmitting &&
     (!job || (job.status !== "queued" && job.status !== "running"));
 
-  const revisionTriggered = Boolean(
-    job?.outputs.rewritePass2 ||
-      job?.outputs.meaningGuardPass2 ||
-      job?.outputs.criticPass2 ||
-      job?.outputs.final?.revision_triggered,
-  );
-
-  const outputCards = useMemo(() => {
-    if (!job) {
-      return [];
-    }
-
-    return OUTPUT_CARD_ORDER.filter(({ key }) => job.outputs[key]);
-  }, [job]);
+  const overview = useMemo(() => deriveJobOverview(job, clock), [job, clock]);
+  const flow = useMemo(() => deriveFlowView(job, inputText), [job, inputText]);
+  const nowHappening = useMemo(() => deriveNowHappening(job), [job]);
+  const activityFeed = useMemo(() => deriveActivityFeed(job), [job]);
+  const agentCards = useMemo(() => deriveAgentCards(job), [job]);
 
   async function handleRun() {
     const trimmed = inputText.trim();
@@ -145,71 +159,84 @@ export function HumanizerLab({ sampleText }: HumanizerLabProps) {
   }
 
   return (
-    <section className="lab-grid">
-      <aside className="column">
-        <AgentGraph
-          agentStatuses={job?.agentStatuses ?? createInitialAgentStatuses()}
-          currentStep={job?.currentStep ?? "Idle"}
-          revisionTriggered={revisionTriggered}
-        />
-      </aside>
-
-      <section className="column center-column">
-        <InputPanel
-          inputText={inputText}
-          sampleText={sampleText}
-          canRun={canRun}
-          isSubmitting={isSubmitting}
-          errorMessage={errorMessage}
-          onInputChange={setInputText}
-          onLoadSample={() => setInputText(sampleText)}
-          onRun={handleRun}
-        />
-
-        <ResultPanel
-          draftInputText={inputText}
-          job={job}
-        />
-      </section>
-
-      <aside className="column">
-        <section className="panel stack-panel">
-          <div className="panel-header">
-            <div>
-              <h2>Event Timeline</h2>
-              <p>Polling keeps this panel in sync as each server-side step finishes.</p>
-            </div>
+    <section className="lab-workbench">
+      <section className="lab-panels-grid">
+        {job ? (
+          <div className="panel-slot panel-slot-compact">
+            <JobOverview jobId={job.id} overview={overview} />
           </div>
+        ) : null}
 
-          <Timeline events={job?.events ?? []} />
+        <div className="panel-slot">
+          <InputPanel
+            inputText={inputText}
+            sampleText={sampleText}
+            canRun={canRun}
+            isSubmitting={isSubmitting}
+            errorMessage={errorMessage}
+            onInputChange={setInputText}
+            onLoadSample={() => setInputText(sampleText)}
+            onRun={handleRun}
+          />
+        </div>
 
-          <div className="panel-subsection">
-            <div className="subsection-header">
-              <h3>Structured Outputs</h3>
+        <div className="panel-slot">
+          <section className="panel stack-panel">
+            <div className="panel-header">
+              <div>
+                <h2>Activity Feed</h2>
+                <p>Polling keeps the feed in sync so you can follow each handoff and decision.</p>
+              </div>
+            </div>
+
+            <Timeline items={activityFeed} />
+          </section>
+        </div>
+
+        <div className="panel-slot">
+          <NowHappening view={nowHappening} />
+        </div>
+
+        <div className="panel-slot panel-slot-wide">
+          <ResultPanel
+            draftInputText={inputText}
+            job={job}
+          />
+        </div>
+
+        <div className="panel-slot">
+          <section className="panel stack-panel">
+            <div className="panel-header">
+              <div>
+                <h2>Agent Inspector</h2>
+                <p>Summary-first cards surface each pass, while raw JSON stays available for debugging.</p>
+              </div>
               <span className="technical-chip">
-                {outputCards.length} card{outputCards.length === 1 ? "" : "s"}
+                {agentCards.length} card{agentCards.length === 1 ? "" : "s"}
               </span>
             </div>
 
-            {outputCards.length === 0 ? (
+            {agentCards.length === 0 ? (
               <div className="empty-state small-empty">
-                Agent outputs will appear here as each step completes.
+                Agent summaries will appear here as each pass finishes.
               </div>
             ) : (
               <div className="agent-card-list">
-                {outputCards.map((card, index) => (
+                {agentCards.map((card) => (
                   <AgentCard
                     key={card.key}
-                    title={card.label}
-                    output={job?.outputs[card.key]}
-                    defaultOpen={index === outputCards.length - 1}
+                    card={card}
                   />
                 ))}
               </div>
             )}
-          </div>
-        </section>
-      </aside>
+          </section>
+        </div>
+      </section>
+
+      <section className="lab-flow-row">
+        <AgentGraph flow={flow} />
+      </section>
     </section>
   );
 }
